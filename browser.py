@@ -1,13 +1,25 @@
 import asyncio
 import random
 from pathlib import Path
+from contextlib import AsyncExitStack
 from playwright.async_api import async_playwright
+from playwright_stealth import Stealth 
 from dotenv import load_dotenv
 import logging
+from config import settings
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+UA_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+]
 
 class BrowserManager:
     def __init__(self):
@@ -15,8 +27,19 @@ class BrowserManager:
         self.context = None
         self.page = None
         self.playwright = None
+        self.exit_stack = AsyncExitStack()
         self.auth_path = Path("auth/gemini_state.json")
         self.auth_path.parent.mkdir(exist_ok=True)
+        self.current_ua = None
+
+    def _get_user_agent(self):
+        if settings.USER_AGENT and settings.USER_AGENT.strip():
+            logger.info("Using custom User-Agent from config")
+            return settings.USER_AGENT.strip()
+        
+        ua = random.choice(UA_POOL)
+        logger.info(f"Using random User-Agent: {ua[:30]}...")
+        return ua
 
     async def init_browser(self, force_login=False):
         if self.page and not self.page.is_closed():
@@ -25,30 +48,51 @@ class BrowserManager:
         if self.browser:
             await self.close()
 
-        self.playwright = await async_playwright().start()
+        self.current_ua = self._get_user_agent()
+
+        stealth_ctx = Stealth().use_async(async_playwright())
+        self.playwright = await self.exit_stack.enter_async_context(stealth_ctx)
+        
+        launch_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            f"--user-agent={self.current_ua}"
+        ]
+        
+        if settings.HEADLESS:
+             launch_args.append("--headless=new")
+
         self.browser = await self.playwright.chromium.launch(
-            headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
-            ]
+            headless=settings.HEADLESS,
+            args=launch_args
         )
+
+        context_options = {
+            "viewport": {"width": 1920, "height": 1080},
+            "locale": "en-US",
+            "user_agent": self.current_ua,
+            "timezone_id": "America/New_York",
+            "permissions": ["geolocation"]
+        }
 
         if self.auth_path.exists() and not force_login:
             self.context = await self.browser.new_context(
                 storage_state=str(self.auth_path),
-                viewport={"width": 1920, "height": 1080},
-                locale="en-US"
+                **context_options
             )
         else:
             self.context = await self.browser.new_context(
-                viewport={"width": 1920, "height": 1080},
-                locale="en-US"
+                **context_options
             )
 
         self.page = await self.context.new_page()
         
+        try:
+            is_webdriver = await self.page.evaluate("navigator.webdriver")
+            logger.info(f"Stealth Status - navigator.webdriver: {is_webdriver}")
+        except Exception:
+            pass
+
         if not self.auth_path.exists() or force_login:
             await self._login_flow()
         else:
@@ -94,6 +138,7 @@ class BrowserManager:
 
     async def _login_flow(self):
         await self.page.goto("https://accounts.google.com/signin")
+        print(f"Current User-Agent: {self.current_ua}")
         print("Please login to your Google account and press Enter to continue...")
         await asyncio.to_thread(input)
         try:
@@ -153,5 +198,5 @@ class BrowserManager:
     async def close(self):
         if self.browser:
             await self.browser.close()
-        if self.playwright:
-            await self.playwright.stop()
+        if self.exit_stack:
+            await self.exit_stack.aclose()

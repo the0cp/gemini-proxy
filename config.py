@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from pathlib import Path
+from typing import Optional
 
 class Settings(BaseSettings):
     MAX_REQUESTS_PER_MIN: int = 12
@@ -9,6 +10,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "info" 
     AUTH_DIR: Path = Path("auth")
     LOG_DIR: Path = Path("logs")
+    USER_AGENT: Optional[str] = None
 
     class Config:
         env_file = ".env"
