@@ -8,6 +8,21 @@ This project uses `playwright` to run a real browser instance (Chrome/Chromium) 
 3. Streams the response text back to the API client in real-time.
 4. Manages authentication cookies to keep the session alive.
 
+## Features
+
+This project is more than just a wrapper; it implements advanced techniques to mimic a real human user.
+
+*   **OpenAI API Compatible**: Drop-in replacement for OpenAI clients. Use it with existing tools like LangChain, TavernAI, or custom scripts.
+*   **Stealth & Anti-Detect**:
+    *   **Fingerprint Randomization**: Rotates between Windows, macOS, and Linux browser signatures.
+    *   **Deep Consistency**: Synchronizes HTTP User-Agents with JavaScript `navigator` properties to pass rigid consistency checks.
+    *   **Context Masking**: Uses `playwright-stealth` to hide WebDriver signals.
+*   **Human-like Behavior Simulation**:
+    *   **Natural Typing**: Abandoned instant text injection (`fill()`) in favor of character-by-character typing with variable speed (10ms-50ms jitter). Long prompts (e.g., 2000+ chars) will take a few seconds to "type" into the browser before sending.
+    *   **Randomized Interactions**: Includes "hesitation" delays (0.5s-1.5s) before clicking buttons to simulate human thought processes and mouse movement.
+    *   **Dynamic Waits**: Avoids fixed sleep timers, making the bot's behavior unpredictable to pattern-matching algorithms.
+*   **Session Persistence**: Automatically saves and loads authentication cookies (`auth/gemini_state.json`) to maintain login state across restarts.
+
 ## Installation
 
 ```bash

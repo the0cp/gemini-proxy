@@ -155,10 +155,24 @@ class BrowserManager:
         try:
             textbox = self.page.get_by_role("textbox")
             await textbox.click()
-            await textbox.fill(prompt)
+            await textbox.fill("") 
+            for char in prompt:
+                await self.page.keyboard.type(char)
+                delay = random.uniform(0.01, 0.05)
+                await asyncio.sleep(delay)
+
         except Exception:
+            logger.warning("Error typing message, restarting browser...")
             await self.init_browser()
-            await self.page.get_by_role("textbox").fill(prompt)
+            textbox = self.page.get_by_role("textbox")
+            await textbox.click()
+            await textbox.fill("")
+            for char in prompt:
+                await self.page.keyboard.type(char)
+                await asyncio.sleep(random.uniform(0.01, 0.05))
+
+        hesitation_time = random.uniform(0.5, 1.5)
+        await asyncio.sleep(hesitation_time)
 
         await self.page.get_by_role("button", name="Send").click()
         await asyncio.sleep(1.0)
