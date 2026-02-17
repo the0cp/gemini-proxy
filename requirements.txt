@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+playwright
+python-dotenv
+slowapi
+pydantic
+httpx
+python-multipart
