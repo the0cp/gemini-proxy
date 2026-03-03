@@ -3,7 +3,7 @@ import random
 from pathlib import Path
 from contextlib import AsyncExitStack
 from playwright.async_api import async_playwright
-from playwright_stealth import Stealth 
+from undetected_playwright import Tarnished
 from dotenv import load_dotenv
 import logging
 from config import settings
@@ -50,8 +50,7 @@ class BrowserManager:
 
         self.current_ua = self._get_user_agent()
 
-        stealth_ctx = Stealth().use_async(async_playwright())
-        self.playwright = await self.exit_stack.enter_async_context(stealth_ctx)
+        self.playwright = await self.exit_stack.enter_async_context(async_playwright())
         
         launch_args = [
             "--disable-blink-features=AutomationControlled",
@@ -64,7 +63,8 @@ class BrowserManager:
 
         self.browser = await self.playwright.chromium.launch(
             headless=settings.HEADLESS,
-            args=launch_args
+            args=launch_args,
+            channel="chrome"
         )
 
         context_options = {
@@ -84,6 +84,8 @@ class BrowserManager:
             self.context = await self.browser.new_context(
                 **context_options
             )
+
+        Tarnished.apply_stealth(self.context)
 
         self.page = await self.context.new_page()
         
