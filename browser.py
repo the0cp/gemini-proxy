@@ -158,20 +158,30 @@ class BrowserManager:
             textbox = self.page.get_by_role("textbox")
             await textbox.click()
             await textbox.fill("") 
-            for char in prompt:
-                await self.page.keyboard.type(char)
-                delay = random.uniform(0.01, 0.05)
-                await asyncio.sleep(delay)
+            
+            lines = prompt.split('\n')
+            for i, line in enumerate(lines):
+                if line:
+                    await self.page.keyboard.insert_text(line)
+                
+                if i < len(lines) - 1:
+                    await self.page.keyboard.press("Shift+Enter")
+                    await asyncio.sleep(0.02)
 
-        except Exception:
-            logger.warning("Error typing message, restarting browser...")
+        except Exception as e:
+            print(f"Error typing message, restarting browser... {e}")
             await self.init_browser()
             textbox = self.page.get_by_role("textbox")
             await textbox.click()
             await textbox.fill("")
-            for char in prompt:
-                await self.page.keyboard.type(char)
-                await asyncio.sleep(random.uniform(0.01, 0.05))
+            
+            lines = prompt.split('\n')
+            for i, line in enumerate(lines):
+                if line:
+                    await self.page.keyboard.insert_text(line)
+                if i < len(lines) - 1:
+                    await self.page.keyboard.press("Shift+Enter")
+                    await asyncio.sleep(0.02)
 
         hesitation_time = random.uniform(0.5, 1.5)
         await asyncio.sleep(hesitation_time)
